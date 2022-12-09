@@ -1,0 +1,86 @@
+---
+title: "Project Praktikum Data Science"
+author: "Alfian Rizki M A / Bagas D Ibrahim"
+date: "2022-11-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(party)
+```
+
+## Import Dataset
+
+```{r}
+dataset <- read.csv("Europe_Hotel_Booking_Satisfaction_Score.csv")
+View(dataset)
+```
+
+## Data Cleaning
+
+```{r}
+#### Mengisi Tabel N/A dengan mean
+dataclean1 <- dataset
+for(i in 1:ncol(dataclean1)){
+  dataclean1[is.na(dataclean1[,i]), i] <- mean(dataclean1[,i], na.rm = TRUE)
+}
+
+#### Menghapus Tabel N/a Pada tabel yang mempunyai tipedata Char
+dataclean2 <- dataclean1
+dataclean2 <- na.omit(dataclean1)
+str(dataclean2)
+
+#### Mengganti value pada tabel yang berisi not defined dengan nilai modus pada data
+modus <- function(x) { 
+  ux <- unique(x) 
+  return (ux[which.max(tabulate(match(x, ux)))]) 
+  }
+modusdata <- modus(dataclean2$Type.Of.Booking)
+
+dataclean3 <- dataclean2 %>% mutate(Type.Of.Booking=recode(Type.Of.Booking, 'Not defined'='Group bookings'))
+View(dataclean3)
+```
+
+## Data Preprocessing
+```{r}
+### Mengubah data char menjadi factor
+dataready <- dataclean3 %>% mutate(across(where(is.character), as.factor))
+str(dataready)
+```
+
+## Membagi data testing dan data training
+```{r}
+set.seed(1234)
+split <- sample(2, nrow(dataready), replace = TRUE, prob = c(0.8, 0.2))
+datatrain <- dataready[split==1,]
+datatest <- dataready[split==2,]
+
+```
+
+## Membuat model pengolahan data
+```{r}
+predictor <- satisfaction~Gender+Age+purpose_of_travel+Type.of.Travel+Type.Of.Booking+Hotel.wifi.service+Departure.Arrival..convenience+Ease.of.Online.booking+
+  Hotel.location+Food.and.drink+Stay.comfort+Common.Room.entertainment+Checkin.Checkout.service+Other.service+Cleanliness
+tree <- rpart(predictor, data = datatrain)
+prp(tree)
+```
+
+## check prediktor pada data train
+```{r}
+## Confusion Matrix pada data training
+prediksi = predict(tree, newdata = datatrain, type = "class")
+table(prediksi, datatrain$satisfaction)
+```
+
+## Evaluasi dan check pada data test
+```{r}
+## Confusion matrix dan evaluasi pada data test
+testPredict = predict(tree, newdata = datatest, type = "class")
+confusionMatrix(data = testPredict, reference = datatest$satisfaction)
+tree$variable.importance
+barplot(tree$variable.importance)
+```
